@@ -1,7 +1,6 @@
 // =====================================================
-// ARDUINO MODBUS SLAVE - PELTİER KONTROL (BASİT)
-// =====================================================
-// 3 Bölüm:
+// ARDUINO MODBUS SLAVE - PELTİER KONTROL 
+// ====================================================
 // 1. Sensör ölçümü (x100 int)
 // 2. Modbus haberleşme
 // 3. Röle kontrolü
