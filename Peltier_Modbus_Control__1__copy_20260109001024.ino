@@ -1,14 +1,12 @@
 // =====================================================
 // ARDUINO MODBUS SLAVE - PELTİER KONTROL 
-// ====================================================
-// 1. Sensör ölçümü (x100 int)
-// 2. Modbus haberleşme
-// 3. Röle kontrolü
 // =====================================================
 
 #include <ModbusRTUSlave.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
 
 // ==================== PIN TANIMLARI ====================
 #define DE_RE_PIN 2          // MAX485 DE/RE
@@ -17,9 +15,13 @@
 #define SENSOR2_PIN 11       // İçeride 1
 #define SENSOR3_PIN 12       // İçeride 2
 
-#define SSR_PIN 5            // SSR PWM
+#define SSR_PIN 9            // SSR PWM
 #define RELAY1_PIN 6         // Röle 1
 #define RELAY2_PIN 7         // Röle 2
+
+// ==================== LCD ====================
+// I2C adresi: 0x27 veya 0x3F (çalışmazsa değiştir)
+LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 // ==================== MODBUS ====================
 #define SLAVE_ID 1
@@ -49,6 +51,7 @@ int16_t temp_outside = 0;   // x100
 
 // ==================== ZAMANLAMA ====================
 unsigned long lastSensorRead = 0;
+unsigned long lastLcdUpdate = 0;
 
 // ==================== SETUP ====================
 void setup() {
@@ -62,6 +65,14 @@ void setup() {
     analogWrite(SSR_PIN, 0);
     digitalWrite(RELAY1_PIN, LOW);
     digitalWrite(RELAY2_PIN, LOW);
+    
+    // LCD başlat
+    lcd.init();
+    lcd.backlight();
+    lcd.setCursor(0, 0);
+    lcd.print("Peltier Kontrol");
+    lcd.setCursor(0, 1);
+    lcd.print("Baslatiliyor...");
     
     // Serial ve Modbus
     Serial.begin(BAUD);
@@ -84,6 +95,9 @@ void setup() {
         digitalWrite(LED_BUILTIN, LOW);
         delay(200);
     }
+    
+    delay(1000);
+    lcd.clear();
 }
 
 // ==================== LOOP ====================
@@ -174,6 +188,34 @@ void loop() {
         wasHeating = false;
         wasCooling = false;
     }
+    
+    // ========== BÖLÜM 4: LCD GÖSTERME ==========
+    if (millis() - lastLcdUpdate >= 500) {
+        lastLcdUpdate = millis();
+        
+        // Satır 1: İç sıcaklık
+        lcd.setCursor(0, 0);
+        lcd.print("Ic:");
+        lcd.print(temp_inside1 / 100.0, 1);
+        lcd.print("C ");
+        
+        // Durum göster
+        if (controlOutput > 0) {
+            lcd.print("ISIT");
+        } else if (controlOutput < 0) {
+            lcd.print("SOGU");
+        } else {
+            lcd.print(" OFF");
+        }
+        
+        // Satır 2: Dış sıcaklık ve PWM
+        lcd.setCursor(0, 1);
+        lcd.print("Dis:");
+        lcd.print(temp_outside / 100.0, 1);
+        lcd.print("C ");
+        lcd.print(controlOutput);
+        lcd.print("   ");
+    }
 }
 
 // ==================== NOTLAR ====================
@@ -193,19 +235,18 @@ void loop() {
  * -127: %50 soğutma (R1=L, R2=L, PWM=127)
  * -255: Tam soğutma (R1=L, R2=L, PWM=255)
  *
- * PLC OKUMA:
- * ----------
- * tempReal = INT_TO_REAL(register) / 100.0
- *
+/*
  * PIN BAĞLANTILARI:
  * -----------------
  * 0 (RX)  → MAX485 RO
  * 1 (TX)  → MAX485 DI
  * 2       → MAX485 DE/RE
- * 5       → SSR PWM
  * 6       → Röle 1
  * 7       → Röle 2
  * 8       → Sensör 1 (Dış)
+ * 9       → SSR PWM
  * 11      → Sensör 2 (İç 1)
  * 12      → Sensör 3 (İç 2)
+ * A4      → LCD SDA
+ * A5      → LCD SCL
  */
